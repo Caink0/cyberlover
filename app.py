@@ -2,11 +2,26 @@ from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
+from linebot.exceptions import InvalidSignatureError
 import requests
 import os
 from flask import Flask
 
 app = Flask(__name__)
+line_bot_api = LineBotApi('G6XX6XJ9dAJE6fybXkV0G0gPcrs+CrfNP2g+lt384EQBLpgLP+n048ToivsxXKDzACgINQwifefmpsaoI9209Hl1wFF71Nhbfh0HDxgX6XOS/CRqY18/hArcSz9T/Gyxz2R/bMH9nghFLppjQm9uVAdB04t89/1O/w1cDnyilFU=')
+handler = WebhookHandler('b841443f9cec9bb11be4903713013994')
+@app.route("/webhook", methods=['POST'])
+def webhook():
+    # 驗證 LINE 的簽名
+    signature = request.headers['X-Line-Signature']
+    body = request.get_data(as_text=True)
+    try:
+        handler.handle(body, signature)
+    except InvalidSignatureError:
+        abort(400)
+    return 'OK', 200
+# 示例回應訊息（根據您的需求調整）
+from linebot.models import TextSendMessage
 
 # 您的應用程式邏輯...
 
