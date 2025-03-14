@@ -13,15 +13,24 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # 從環境變量中獲取憑證
-line_bot_api = LineBotApi(os.getenv('LINE_CHANNEL_ACCESS_TOKEN'))
-handler = WebhookHandler(os.getenv('LINE_CHANNEL_SECRET'))
-xai_api_key = os.getenv('XAI_API_KEY')
+LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
+LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET')
+XAI_API_KEY = os.getenv('XAI_API_KEY')
+
+# 檢查環境變量是否已設定
+if not LINE_CHANNEL_ACCESS_TOKEN or not LINE_CHANNEL_SECRET or not XAI_API_KEY:
+    logger.error("環境變量未正確設定，請檢查 LINE_CHANNEL_ACCESS_TOKEN, LINE_CHANNEL_SECRET 和 XAI_API_KEY")
+    raise ValueError("環境變量未正確設定")
+
+# 初始化 LINE Bot
+line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
+handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 # x.ai API 設置
 XAI_API_URL = "https://api.x.ai/v1/chat/completions"
 XAI_HEADERS = {
     "Content-Type": "application/json",
-    "Authorization": f"Bearer {xai_api_key}"
+    "Authorization": f"Bearer {XAI_API_KEY}"
 }
 
 # 儲存每個用戶的角色個性
@@ -59,7 +68,7 @@ def handle_message(event):
                 event.reply_token,
                 TextSendMessage(text=reply)
             )
-            return  # 提前返回，避免執行後續邏輯
+            return  # 提前返回，避免後續邏輯
     else:
         # 如果用戶已設定個性
         if user_message.startswith("設定角色："):
