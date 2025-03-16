@@ -1,8 +1,10 @@
 from flask import Flask, request, abort
 import logging
-from linebot import LineBotApi, WebhookHandler
-from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage
+from linebot.v3.messaging import MessagingApi, Configuration
+from linebot.v3.webhooks import WebhookHandler
+from linebot.v3.exceptions import InvalidSignatureError
+from linebot.v3.webhooks.models import MessageEvent, TextMessageContent
+from linebot.v3.messaging.models import TextSendMessage
 import os
 import requests
 import random
@@ -22,12 +24,13 @@ if not all([LINE_CHANNEL_ACCESS_TOKEN, LINE_CHANNEL_SECRET, XAI_API_KEY]):
     logger.error("環境變量未正確設定，請檢查 LINE_CHANNEL_ACCESS_TOKEN, LINE_CHANNEL_SECRET 和 XAI_API_KEY")
     raise ValueError("環境變量未正確設定")
 
-# 初始化 LINE Bot
-line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
+# 初始化 LINE Bot（使用新的 LINE Bot SDK v3）
+configuration = Configuration(channel_access_token=LINE_CHANNEL_ACCESS_TOKEN)
+line_bot_api = MessagingApi(configuration)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
-# x.ai API 設置
-XAI_API_URL = "https://api.x.ai/v1/chat/completions"
+# x.ai API 設置（確認正確端點）
+XAI_API_URL = "https://api.x.ai/v1/chat/completions"  # 請確認這是正確的端點
 XAI_HEADERS = {
     "Content-Type": "application/json",
     "Authorization": f"Bearer {XAI_API_KEY}"
@@ -97,7 +100,7 @@ def webhook():
     return 'OK', 200
 
 # 處理訊息事件
-@handler.add(MessageEvent, message=TextMessage)
+@handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
     user_id = event.source.user_id
     user_message = event.message.text.strip()
@@ -115,8 +118,8 @@ def handle_message(event):
     messages = split_message(xai_response, MAX_LINE_MESSAGE_LENGTH)
     for msg in messages:
         line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(text=msg)
+            reply_token=event.reply_token,
+            messages=[TextSendMessage(text=msg)]
         )
     logger.info("Reply sent successfully")
 
