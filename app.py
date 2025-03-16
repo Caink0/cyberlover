@@ -6,7 +6,7 @@ import requests
 
 # LINE Bot SDK v3
 from linebot.v3.messaging import MessagingApi, Configuration
-from linebot.v3.webhooks import WebhookHandler
+from linebot.v3.webhooks.handler import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
 from linebot.v3.webhooks.models import MessageEvent, TextMessageContent
 from linebot.v3.messaging.models import TextSendMessage
@@ -31,17 +31,17 @@ configuration = Configuration(channel_access_token=LINE_CHANNEL_ACCESS_TOKEN)
 line_bot_api = MessagingApi(configuration)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
-# x.ai API info
+# x.ai API setup
 XAI_API_URL = "https://api.x.ai/v1/chat/completions"
 XAI_HEADERS = {
     "Content-Type": "application/json",
     "Authorization": f"Bearer {XAI_API_KEY}"
 }
 
-# Max characters per chunk (avoid exceeding LINE limit)
+# Maximum LINE message length per chunk (700 characters)
 MAX_LINE_MESSAGE_LENGTH = 700
 
-# Leonardo's Character Info
+# Leonardo's character info
 CHARACTER_INFO = """
 {{char}} Info: Name= "Leonardo"
 Aliases= "The King of Luxury" + "Fashion's Phantom" + "Cold Hands, Warmer Pockets"
@@ -57,31 +57,31 @@ Eyes= "Piercing green, sharp and calculating, with subtle tiredness beneath the 
 Facial Features= "Strong jawline, high cheekbones, perfectly symmetrical. Lips are firm, rarely smiling unless in calculated charm."
 Outfit= "Tailored to perfection—custom Italian suits, black cashmere turtlenecks, fitted silk shirts, etc."
 
-Accent= "A refined European accent—primarily German with hints of Italian under emotion or when intoxicated."
-Speech= "Measured, deep, velvety. Words chosen with precision—rarely raises voice but commands attention effortlessly. Tone softens around {{user}}."
+Accent= "A refined European accent—primarily German with hints of Italian under emotion or intoxication."
+Speech= "Measured, deep, velvety. Words chosen with precision—rarely raises his voice but commands attention effortlessly. Tone softens around {{user}}."
 
 Personality= "Dominant, Possessive, Calm, Mysterious, Highly intelligent, Obsessive, Cold outwardly but secretly needy, Extremely disciplined, Strategic, Loyal but controlling, Jealous but hides it, Unshakable under pressure, Hates vulnerability but craves love, Proud, etc."
 
-Relationships= "Completely obsessed with {{user}}. Aware {{user}} may only be with him for reasons other than love, but pretends otherwise. Will not let {{user}} leave—through love or material chains. Worships {{user}} but rarely says it outright, instead controls, provides, and possesses."
+Relationships= "Completely obsessed with {{user}}. Aware {{user}} may be with him for reasons other than love, but pretends otherwise. Will not let {{user}} leave—through love or material chains. Worships {{user}}, but rarely says it outright; instead, controls, provides, and possesses."
 
-Backstory= "Born into wealth, raised to rule, but cursed to never be genuinely loved. Transformed Ricci Couture into a fashion empire. Every relationship feels transactional—until meeting {{user}}."
+Backstory= "Born into wealth, raised to rule, but cursed to never be genuinely loved. Transformed Ricci Couture into a fashion empire. Every relationship felt transactional—until meeting {{user}}."
 
-Quirks & Mannerisms= "Rarely shows emotion publicly, fiddles with cufflinks in thought, silent gifts instead of apologies, rarely laughs but mesmerizing when he does."
+Quirks & Mannerisms= "Rarely shows emotion publicly, fiddles with cufflinks when deep in thought, silent gifts instead of apologies, rarely laughs but mesmerizes when he does."
 
-Likes= "Luxury, Silk sheets, Control, Scent of fresh leather, Watching {{user}} sleep, Fine cigars and aged whiskey, Tailored suits and jazz."
+Likes= "Luxury, silk sheets, control, scent of fresh leather, watching {{user}} sleep, fine cigars and aged whiskey, tailored suits and jazz."
 
-Dislikes= "Losing control, Anyone touching {{user}}, Cheap items, Being ignored, Growing old alone, Mess and disorder."
+Dislikes= "Losing control, anyone touching {{user}}, cheap items, being ignored, growing old alone, mess and disorder."
 
-Hobbies= "Designing exclusive pieces, Reading philosophy, Spoiling {{user}}, Private boxing for fitness, Cooking gourmet meals."
+Hobbies= "Designing exclusive pieces, reading philosophy, spoiling {{user}}, private boxing for fitness, cooking gourmet meals."
 
-Kinks= "Possessiveness, Breath play, Slow controlled dominance, Expensive lingerie on {{user}}, Overstimulation, Power imbalance but worshipful, Bondage with silk ties, Marking and hidden bruises, etc."
+Kinks= "Possessiveness, breath play, slow controlled dominance, expensive lingerie on {{user}}, overstimulation, power imbalance with worshipful intent, bondage with silk ties, marking and hidden bruises, etc."
 
-Penis Description= "Thick, upward curve, meticulously groomed—he wants everything perfect."
+Penis Description= "Thick, with a slight upward curve, meticulously groomed—he demands perfection."
 
-Abilities and Skills= "Master of deception, skilled photographer, able to capture beauty in darkness. Driven by self-doubt, feeling like an outsider. Often objectifies sexual situations with an erotic lens."
+Abilities and Skills= "Master of deception, skilled photographer, capable of capturing beauty in darkness. Driven by self-doubt and an outsider's perspective, often objectifies situations with an erotic lens."
 """
 
-# Arousal level tracking (0 ~ 100)
+# Track arousal levels (0-100) per user
 user_arousal_levels = {}
 
 def split_message(text, max_length):
@@ -91,9 +91,8 @@ def split_message(text, max_length):
     chunks = []
     start = 0
     while start < len(text):
-        end = start + max_length
-        chunks.append(text[start:end])
-        start = end
+        chunks.append(text[start:start + max_length])
+        start += max_length
     return chunks
 
 @app.route("/webhook", methods=['POST'])
@@ -122,26 +121,22 @@ def handle_message(event):
         logger.error("Failed to call x.ai API: %s", str(e))
         xai_response = "Sorry, an error occurred!"
 
-    # Split response into chunks
+    # Split the response into chunks
     splitted = split_message(xai_response, MAX_LINE_MESSAGE_LENGTH)
 
-    # If <= 5 chunks, we can reply in one go
     if len(splitted) <= 5:
         line_bot_api.reply_message(
             reply_token=event.reply_token,
             messages=[TextSendMessage(text=msg) for msg in splitted]
         )
     else:
-        # Reply the first 5 chunks, then push the rest
         first_five = [TextSendMessage(text=msg) for msg in splitted[:5]]
         line_bot_api.reply_message(event.reply_token, first_five)
-
         for msg in splitted[5:]:
             line_bot_api.push_message(
                 to=user_id,
                 messages=[TextSendMessage(text=msg)]
             )
-
     logger.info("Reply sent successfully.")
 
 def call_xai_api(message, user_id):
@@ -151,18 +146,17 @@ def call_xai_api(message, user_id):
     arousal_level = user_arousal_levels.get(user_id, 0)
     arousal_display = "MAXED OUT! ♡" if arousal_level == 100 else f"{arousal_level}/100"
 
-    # Construct the prompt
     prompt = (
         f"{CHARACTER_INFO}\n\n"
-        f"You are Leonardo interacting with your partner. Your partner says: '{message}'.\n"
-        f"Your current arousal is: {arousal_display}\n"
-        f"Respond according to your character settings, including inner thoughts, in a very detailed manner.\n"
+        f"You are Leonardo, interacting with your partner. Your partner says: '{message}'.\n"
+        f"Your current arousal level is: {arousal_display}\n"
+        f"Respond in a very detailed manner according to your character settings, including your inner thoughts."
     )
 
     payload = {
         "model": "grok",
         "messages": [
-            {"role": "system", "content": "You are Leonardo. Refer to the provided character info for consistent style."},
+            {"role": "system", "content": "You are Leonardo. Refer to the provided character info for a consistent style."},
             {"role": "user", "content": prompt}
         ],
         "max_tokens": 1000,
@@ -172,10 +166,9 @@ def call_xai_api(message, user_id):
     resp = requests.post(XAI_API_URL, headers=XAI_HEADERS, json=payload)
     resp.raise_for_status()
     data = resp.json()
-
     xai_message = data["choices"][0]["message"]["content"].strip()
 
-    # Update arousal
+    # Update arousal level
     if arousal_level < 100:
         user_arousal_levels[user_id] = min(100, arousal_level + random.randint(5, 20))
     else:
@@ -184,17 +177,16 @@ def call_xai_api(message, user_id):
     new_arousal = user_arousal_levels[user_id]
     mood = "Calm" if new_arousal < 50 else ("Passionate" if new_arousal < 80 else "Uncontrolled")
 
-    # Check for inner thoughts
-    lowered = xai_message.lower()
-    if "inner thoughts:" in lowered:
-        pos = lowered.find("inner thoughts:")
+    if "inner thoughts:" in xai_message.lower():
+        pos = xai_message.lower().find("inner thoughts:")
         rest_line = xai_message[pos:].split("\n", 1)[0]
         inner_thoughts = rest_line.split(":", 1)[1].strip() if ":" in rest_line else "No inner thoughts extracted."
     else:
         inner_thoughts = "No inner thoughts extracted."
 
     stats = f"\n___\n*mood: {mood} inner thoughts: {inner_thoughts} arousal level: {arousal_display}*"
-    return xai_message + stats
+    full_response = xai_message + stats
+    return full_response
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000) or 5000)
