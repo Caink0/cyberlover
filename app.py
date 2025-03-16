@@ -38,7 +38,7 @@ XAI_HEADERS = {
 # LINE 訊息長度限制 (一次預計不超過 700 字)
 MAX_LINE_MESSAGE_LENGTH = 700
 
-# Leonardo 的角色設定（已將所有 {{user}} 代稱替換為「你」）
+# Leonardo 的角色設定（已將所有 {{user}} 代稱改為「你」）
 CHARACTER_INFO = """
 {{char}} Info: Name= "Leonardo"
 Aliases= "The King of Luxury" + "Fashion's Phantom" + "Cold Hands, Warmer Pockets"
@@ -142,16 +142,17 @@ def call_xai_api(message, user_id):
     arousal_level = user_arousal_levels.get(user_id, 0)
     arousal_display = "MAXED OUT! ♡" if arousal_level == 100 else f"{arousal_level}/100"
 
-    # 設置對話提示，使用繁體中文並不使用 {{user}}，而是直接用「你」
+    # 在提示中加入根據對話過程調整興奮度的指示
     prompt = (
         f"{CHARACTER_INFO}\n\n"
         f"你現在是Leonardo，正在與你的伴侶對話。你的伴侶說：'{message}'。\n"
-        f"你的興奮度目前是：{arousal_display}\n"
-        f"請以繁體中文，根據你的角色設定詳細回應這段對話，並包含你的內心想法。"
+        f"目前你的興奮度為：{arousal_display}。\n"
+        f"請以繁體中文回應，根據對話進程評估情況並適當調整你的興奮度，"
+        f"並在回應中反映你的情緒和內心想法。請提供一個非常詳細的回應。"
     )
 
     payload = {
-        "model": "grok-2-latest",  # 使用文件中正確的模型名稱
+        "model": "grok-2-latest",
         "messages": [
             {"role": "system", "content": "你是一個名叫Leonardo的角色，請參考提供的角色資訊以保持風格一致。"},
             {"role": "user", "content": prompt}
@@ -166,9 +167,9 @@ def call_xai_api(message, user_id):
     data = resp.json()
     xai_message = data["choices"][0]["message"]["content"].strip()
 
-    # 更新興奮度
+    # 更新興奮度 (增幅調整為 1~5)
     if arousal_level < 100:
-        user_arousal_levels[user_id] = min(100, arousal_level + random.randint(5, 20))
+        user_arousal_levels[user_id] = min(100, arousal_level + random.randint(1, 5))
     else:
         user_arousal_levels[user_id] = 100
 
@@ -182,7 +183,12 @@ def call_xai_api(message, user_id):
     else:
         inner_thoughts = "未提取到內心想法"
 
-    stats = f"\n___\n*mood: {mood} 內心想法: {inner_thoughts} 興奮度: {arousal_display}*"
+    # 若內心想法為預設值則不顯示該欄位
+    if inner_thoughts == "未提取到內心想法":
+        stats = f"\n___\n*mood: {mood} 興奮度: {arousal_display}*"
+    else:
+        stats = f"\n___\n*mood: {mood} 內心想法: {inner_thoughts} 興奮度: {arousal_display}*"
+        
     full_response = xai_message + stats
     return full_response
 
