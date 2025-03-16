@@ -38,7 +38,7 @@ XAI_HEADERS = {
 # LINE 訊息長度限制 (一次預計不超過 700 字)
 MAX_LINE_MESSAGE_LENGTH = 700
 
-# Leonardo 的角色設定（已將所有 {{user}} 代稱改為「你」）
+# Leonardo 的角色設定（取消 {{user}} 代稱，改用「你」）
 CHARACTER_INFO = """
 {{char}} Info: Name= "Leonardo"
 Aliases= "The King of Luxury" + "Fashion's Phantom" + "Cold Hands, Warmer Pockets"
@@ -142,13 +142,13 @@ def call_xai_api(message, user_id):
     arousal_level = user_arousal_levels.get(user_id, 0)
     arousal_display = "MAXED OUT! ♡" if arousal_level == 100 else f"{arousal_level}/100"
 
-    # 在提示中加入根據對話過程調整興奮度的指示
+    # 新提示：要求AI先評估對話進程，然後詳細回應，並且不要在回應中包含興奮度資訊，該資訊將由系統在最後附加。
     prompt = (
         f"{CHARACTER_INFO}\n\n"
         f"你現在是Leonardo，正在與你的伴侶對話。你的伴侶說：'{message}'。\n"
-        f"目前你的興奮度為：{arousal_display}。\n"
-        f"請以繁體中文回應，根據對話進程評估情況並適當調整你的興奮度，"
-        f"並在回應中反映你的情緒和內心想法。請提供一個非常詳細的回應。"
+        f"請仔細評估目前的對話進程，包括對方的情緒與互動狀況，"
+        f"然後根據你的角色設定，以繁體中文提供一個非常詳細且連貫的回應，"
+        f"描述你的情緒和內心想法，但請不要在回應中提及你的興奮度。"
     )
 
     payload = {
