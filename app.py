@@ -95,8 +95,8 @@ Abilities and Skills= "{{char}}'s abilities and skills extended beyond his acade
 user_arousal_levels = {}
 
 def split_message(text, max_length):
-    """將超過 max_length 的字串切成多段。"""
-    return [text[i:i + max_length] for i in range(0, len(text), max_length)]
+    """Split the text into multiple chunks if it exceeds max_length."""
+    # or just remove the docstring altogether
 
 @app.route("/webhook", methods=['POST'])
 def webhook():
