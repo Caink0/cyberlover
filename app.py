@@ -17,7 +17,6 @@ LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET')
 XAI_API_KEY = os.getenv('XAI_API_KEY')
 
-# 檢查環境變量是否已設定
 if not LINE_CHANNEL_ACCESS_TOKEN or not LINE_CHANNEL_SECRET or not XAI_API_KEY:
     logger.error("環境變量未正確設定，請檢查 LINE_CHANNEL_ACCESS_TOKEN, LINE_CHANNEL_SECRET 和 XAI_API_KEY")
     raise ValueError("環境變量未正確設定")
@@ -35,6 +34,11 @@ XAI_HEADERS = {
 
 # 儲存每個用戶的角色個性
 user_personalities = {}
+MAX_LINE_MESSAGE_LENGTH = 4000  # LINE 訊息長度限制
+
+# 分段訊息函數
+def split_message(text, max_length):
+    return [text[i:i+max_length] for i in range(0, len(text), max_length)]
 
 # Webhook 路由
 @app.route("/webhook", methods=['POST'])
@@ -56,7 +60,6 @@ def handle_message(event):
     user_message = event.message.text.strip()
     logger.info("Message received from user %s: %s", user_id, user_message)
 
-    # 如果用戶尚未設定角色個性
     if user_id not in user_personalities:
         if user_message.startswith("設定角色："):
             personality = user_message.replace("設定角色：", "").strip()
@@ -68,9 +71,8 @@ def handle_message(event):
                 event.reply_token,
                 TextSendMessage(text=reply)
             )
-            return  # 提前返回，避免後續邏輯
+            return
     else:
-        # 如果用戶已設定個性
         if user_message.startswith("設定角色："):
             personality = user_message.replace("設定角色：", "").strip()
             user_personalities[user_id] = personality
@@ -85,25 +87,33 @@ def handle_message(event):
                 logger.error("Failed to call x.ai API: %s", str(e))
                 reply = "抱歉，出了點問題！"
 
-    # 回覆用戶
-    line_bot_api.reply_message(
-        event.reply_token,
-        TextSendMessage(text=reply)
-    )
+    # 分段發送回應
+    if len(reply) > MAX_LINE_MESSAGE_LENGTH:
+        messages = split_message(reply, MAX_LINE_MESSAGE_LENGTH)
+        for msg in messages:
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text=msg)
+            )
+    else:
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text=reply)
+        )
     logger.info("Reply sent successfully")
 
 # 呼叫 x.ai API
 def call_xai_api(message, personality):
-    system_message = f"You are a {personality} assistant."
+    system_message = f"You are a {personality} assistant. Please provide detailed and comprehensive responses, exceeding 1000 words if possible."
     payload = {
         "messages": [
             {"role": "system", "content": system_message},
-            {"role": "user", "content": message}
+            {"role": "user", "content": message + " 請提供一個非常詳細的回應，至少 1000 字。"}
         ],
         "model": "grok-2-latest",
         "stream": False,
         "temperature": 0,
-        "max_tokens": 100  # 限制回應長度
+        "max_tokens": 1000  # 調整為 1000 或更高
     }
     response = requests.post(XAI_API_URL, headers=XAI_HEADERS, json=payload)
     response.raise_for_status()
