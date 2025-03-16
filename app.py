@@ -124,4 +124,34 @@ def handle_message(event):
 def call_xai_api(message, user_id):
     # 取得當前興奮度
     arousal_level = user_arousal_levels.get(user_id, 0)
-    arousal_display = "MAXED OUT! ♡" if arousal_level == 100 else f"{ar
+    arousal_display = "MAXED OUT! ♡" if arousal_level == 100 else f"{arousal_level}/100"
+
+    # 設置 x.ai API 請求的 payload
+    prompt = f"{CHARACTER_INFO}\n\n你現在是Leonardo，正在與你的伴侶對話。你的伴侶說：'{message}'。\n你的興奮度目前是：{arousal_display}。\n根據你的角色設定，回應這段對話，並保持你的語氣和風格。"
+
+    payload = {
+        "model": "grok",  # 假設使用 x.ai 的 grok 模型，根據實際情況調整
+        "messages": [
+            {"role": "system", "content": "你是一個名叫Leonardo的角色，根據提供的角色資訊回應對話。"},
+            {"role": "user", "content": prompt}
+        ],
+        "max_tokens": 500,  # 根據需要調整生成內容的長度
+        "temperature": 0.7  # 控制生成內容的創造性
+    }
+
+    # 發送請求到 x.ai API
+    response = requests.post(XAI_API_URL, headers=XAI_HEADERS, json=payload)
+    response.raise_for_status()  # 如果請求失敗，會拋出異常
+
+    # 解析回應
+    response_data = response.json()
+    xai_message = response_data['choices'][0]['message']['content'].strip()
+
+    # 更新興奮度（假設根據對話內容增加興奮度，這裡只是簡單示範）
+    user_arousal_levels[user_id] = min(100, arousal_level + random.randint(1, 10))
+
+    return xai_message
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
