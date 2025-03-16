@@ -3,6 +3,8 @@ import logging
 import os
 import random
 import requests
+
+# 使用舊版 line-bot-sdk 匯入方式
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
@@ -36,7 +38,7 @@ XAI_HEADERS = {
 # LINE 訊息長度限制 (一次預計不超過 700 字)
 MAX_LINE_MESSAGE_LENGTH = 700
 
-# Leonardo 的角色設定 (請根據需要補全或調整)
+# Leonardo 的角色設定
 CHARACTER_INFO = """
 {{char}} Info: Name= "Leonardo"
 Aliases= "The King of Luxury" + "Fashion's Phantom" + "Cold Hands, Warmer Pockets"
@@ -147,13 +149,14 @@ def call_xai_api(message, user_id):
     )
 
     payload = {
-        "model": "grok",
+        "model": "grok-2-latest",  # 修改為正確的模型名稱
         "messages": [
             {"role": "system", "content": "You are Leonardo. Refer to the provided character info for a consistent style."},
             {"role": "user", "content": prompt}
         ],
+        "stream": False,           # 加上 stream 參數
         "max_tokens": 1000,
-        "temperature": 0.7
+        "temperature": 0           # 根據文件示例使用 0
     }
 
     resp = requests.post(XAI_API_URL, headers=XAI_HEADERS, json=payload)
@@ -161,7 +164,7 @@ def call_xai_api(message, user_id):
     data = resp.json()
     xai_message = data["choices"][0]["message"]["content"].strip()
 
-    # 更新興奮度
+    # 更新 arousal level
     if arousal_level < 100:
         user_arousal_levels[user_id] = min(100, arousal_level + random.randint(5, 20))
     else:
